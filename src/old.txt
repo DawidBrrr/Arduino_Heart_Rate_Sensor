@@ -1,0 +1,134 @@
+#include <Arduino.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+#include <Wire.h>
+#include <Arduino_FreeRTOS.h>
+
+#define SENSOR_ADC_PIN A0
+#define BUTTON_PIN 2
+
+Adafruit_SH1106G display = Adafruit_SH1106G(128, 64, &Wire);
+
+TaskHandle_t TaskReadSensor;
+TaskHandle_t TaskProcessBPM;
+TaskHandle_t TaskDisplay;
+
+float filteredValue = 0;
+const float alpha = 0.2;
+const int graphWidth = 128;
+const int graphHeight = 64;
+float rawValues[graphWidth] = {0};
+int bpm = 0;
+float prevValue = 0;
+volatile bool measurementActive = false;
+
+void readSensorTask(void *pvParameters) {
+    for(;;) {
+          if (!measurementActive) {
+          vTaskDelay(pdMS_TO_TICKS(20));
+          continue;
+        }
+        int sensorValue = analogRead(SENSOR_ADC_PIN);
+        filteredValue = alpha * sensorValue + (1 - alpha) * filteredValue;
+
+        // Shift array
+        for (int i = 0; i < graphWidth - 1; i++) {
+            rawValues[i] = rawValues[i + 1];
+        }
+        rawValues[graphWidth - 1] = filteredValue;
+
+        vTaskDelay(pdMS_TO_TICKS(20));  // 20 ms
+    }
+}
+
+void processBPMTask(void *pvParameters) {
+    static unsigned long lastPeakTime = 0;
+    static bool waitingForFall = false;
+    unsigned long now;
+    for(;;) {
+        now = millis();
+        float delta = filteredValue - prevValue;
+        prevValue = filteredValue;
+
+        const float detectionThreshold = 1;
+
+        if (!waitingForFall && delta > detectionThreshold) {
+            waitingForFall = true;
+            if (lastPeakTime > 0) {
+                unsigned long interval = now - lastPeakTime;
+                if (interval > 300 && interval < 2000) {
+                    bpm = 60000 / interval;
+                }
+            }
+            lastPeakTime = now;
+        }
+        else if (waitingForFall && delta < -detectionThreshold) {
+            waitingForFall = false;
+        }
+
+        if (now - lastPeakTime > 3000) {
+            bpm = 0;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(50));  // 50 ms
+    }
+}
+
+void displayTask(void *pvParameters) {
+    for(;;) {
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(SH110X_WHITE);
+        display.setCursor(0, 0);
+        display.print("RAW:");
+        display.print((int)rawValues[graphWidth - 1]);
+        display.setCursor(64, 0);
+        display.print("BPM:");
+        display.print(bpm);
+
+        float minVal = rawValues[0];
+        float maxVal = rawValues[0];
+        for (int i = 1; i < graphWidth; i++) {
+            if (rawValues[i] < minVal) minVal = rawValues[i];
+            if (rawValues[i] > maxVal) maxVal = rawValues[i];
+        }
+        if (maxVal == minVal) maxVal = minVal + 1;
+
+        for (int i = 0; i < graphWidth - 1; i++) {
+            int y1 = map(rawValues[i], minVal, maxVal, graphHeight - 1, 10);
+            int y2 = map(rawValues[i + 1], minVal, maxVal, graphHeight - 1, 10);
+            display.drawLine(i, y1, i + 1, y2, SH110X_WHITE);
+        }
+
+        display.display();
+
+        vTaskDelay(pdMS_TO_TICKS(100));  // 100 ms
+    }
+}
+void startMeasurementISR() {
+    measurementActive = !measurementActive;  // przełącznik
+}
+
+void setup() {
+    Serial.begin(115200);
+    pinMode(SENSOR_ADC_PIN, INPUT);
+    Wire.begin();
+
+    if (!display.begin(0x3C, true)) {
+        Serial.println("Display not found");
+        while (1);
+    }
+    display.clearDisplay();
+    display.display();
+
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), startMeasurementISR, FALLING);
+
+    xTaskCreate(readSensorTask, "Read Sensor", 1024, NULL, 2, &TaskReadSensor);
+    xTaskCreate(processBPMTask, "Process BPM", 1024, NULL, 2, &TaskProcessBPM);
+    xTaskCreate(displayTask, "Display Graph", 2048, NULL, 1, &TaskDisplay);
+}
+
+void loop() {
+    // Nic tutaj - RTOS zarządza wszystkim
+}
