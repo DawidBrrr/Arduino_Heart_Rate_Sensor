@@ -1,8 +1,4 @@
 #include "display.h"
-#include "i2c.h"
-#include <string.h>
-#include <stdio.h>
-#include <util/delay.h>
 
 static uint8_t display_buffer[1024]; // 128x64/8 = 1024 bytes
 

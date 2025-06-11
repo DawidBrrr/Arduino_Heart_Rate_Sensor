@@ -2,6 +2,8 @@
 #define PULSE_SENSOR_H
 
 #include <avr/io.h>
+#include "timer.h"
+#include <string.h>
 
 #define GRAPH_WIDTH 128
 #define GRAPH_HEIGHT 64

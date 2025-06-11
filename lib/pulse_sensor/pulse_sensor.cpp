@@ -1,6 +1,4 @@
 #include "pulse_sensor.h"
-#include "timer.h"
-#include <string.h>
 
 void pulse_sensor_init(pulse_sensor_t* sensor) {
     sensor->filtered_value = 0;
@@ -10,7 +8,7 @@ void pulse_sensor_init(pulse_sensor_t* sensor) {
     sensor->waiting_for_fall = 0;
     sensor->alpha = 0.2; // Low-pass filter coefficient
     sensor->detection_threshold = 1.0; // Adjusted threshold
-    sensor->measurement_active = true;;
+    sensor->measurement_active = false; //begin with measurement inactive
     
     // Initialize raw values array
     memset(sensor->raw_values, 0, sizeof(sensor->raw_values));

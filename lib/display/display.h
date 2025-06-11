@@ -3,6 +3,10 @@
 
 #include <avr/io.h>
 #include <avr/pgmspace.h>
+#include "i2c.h"
+#include <string.h>
+#include <stdio.h>
+#include <util/delay.h>
 
 #define SH1106_I2C_ADDRESS 0x3C
 #define SCREEN_WIDTH 128

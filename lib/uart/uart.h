@@ -2,6 +2,7 @@
 #define UART_H
 
 #include <avr/io.h>
+#include <stdio.h>
 
 void uart_init(void);
 void uart_putchar(char c);

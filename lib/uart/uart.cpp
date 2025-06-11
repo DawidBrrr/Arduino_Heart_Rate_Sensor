@@ -1,5 +1,4 @@
 #include "uart.h"
-#include <stdio.h>
 
 void uart_init(void) {
     UBRR0H = 0;
