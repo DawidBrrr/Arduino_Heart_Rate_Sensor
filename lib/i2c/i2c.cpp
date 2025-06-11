@@ -1,8 +1,8 @@
 #include "i2c.h"
 
 void i2c_init(void) {
-    TWSR = 0x00; // No prescaler
-    TWBR = 0x48; // 100kHz at 16MHz: (16000000/100000-16)/2 = 72, but 0x48 works better
+    TWSR = 0x00;    // No prescaler
+    TWBR = 0x0C;    // 400kHz at 16MHz: (16000000/400000-16)/2 = 12 (0x0C)
     TWCR = (1<<TWEN);
 }
 

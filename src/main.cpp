@@ -9,40 +9,45 @@
 #include "display.h"
 #include "pulse_sensor.h"   
 
-#define BUTTON_PIN 2
+#define BUTTON_PIN 3
 #define SENSOR_PIN 0  // ADC0
 
 pulse_sensor_t pulse_sensor;
 volatile uint8_t button_pressed = 0;
+volatile uint32_t interrupt_count = 0;
 
 void button_init(void) {
-    // Set PIN2 as input with pull-up
+    // Set PD3 (INT1) as input with pull-up
     DDRD &= ~(1 << BUTTON_PIN);  // Input
     PORTD |= (1 << BUTTON_PIN);  // Pull-up enabled
     
-    // Configure INT2 for falling edge trigger
-    EICRA &= ~(1 << ISC20);     // Clear bit
-    EICRA |= (1 << ISC21);      // Set bit for falling edge
-    EIMSK |= (1 << INT2);       // Enable INT2
+    // Configure INT1 for falling edge trigger
+    EICRA &= ~(1 << ISC10);     // First bit 0
+    EICRA |= (1 << ISC11);      // Second bit 1 - for falling edge
     
     // Clear any pending interrupt
-    EIFR |= (1 << INTF2);
+    EIFR |= (1 << INTF1);
+    
+    // Enable INT1 interrupt
+    EIMSK |= (1 << INT1);
 }
 
-ISR(INT2_vect) {
+ISR(INT1_vect) {
     static unsigned long last_interrupt_time = 0;
     unsigned long current_time = millis();
+
+    interrupt_count++;
     
     if (current_time - last_interrupt_time > 200) {
         pulse_sensor_start_stop(&pulse_sensor);
-        uart_puts("Button pressed! Active: "); // Debug output
-        uart_print_int(pulse_sensor.measurement_active);
-        uart_puts("\r\n");
+        //uart_puts("Button pressed! Active: "); // Debug output
+        //uart_print_int(pulse_sensor.measurement_active);
+        //uart_puts("\r\n");
         last_interrupt_time = current_time;
     }
     
-    EIFR |= (1 << INTF2);
-    _delay_us(100);
+    EIFR |= (1 << INTF1);
+    //_delay_us(100);
 }
 
 void setup(void) {
@@ -54,22 +59,20 @@ void setup(void) {
     i2c_init();
     display_init();
     pulse_sensor_init(&pulse_sensor);
-    button_init();
+    //button_init();
 
-    // Force active state at startup
-    pulse_sensor.measurement_active = 1;
-    uart_puts("Forcing active state\r\n");
+
     
     sei();
     
-    uart_puts("System initialized\r\n");
+    //uart_puts("System initialized\r\n");
 }
 
 int main(void) {
     setup();
     
     unsigned long last_display_update = 0;
-    unsigned long last_uart_update = 0;
+    //unsigned long last_uart_update = 0;
     
     while (1) {
         unsigned long current_time = millis();
@@ -82,7 +85,7 @@ int main(void) {
         }
         
         // Update display every 30ms
-        if (current_time - last_display_update >= 10) {
+        if (current_time - last_display_update >= 40) {
             display_clear();
             
             if (pulse_sensor.measurement_active) {
@@ -110,6 +113,7 @@ int main(void) {
             // Always show BPM
             display_string(0, 0, "BPM:");
             display_number(30, 0, pulse_sensor.bpm);
+            //display_number(0, 10, interrupt_count); // Show interrupt count
             display_update();
             
             last_display_update = current_time;

@@ -15,7 +15,7 @@ typedef struct {
     int waiting_for_fall;
     float alpha;
     float detection_threshold;
-    int measurement_active;
+    bool measurement_active;
 } pulse_sensor_t;
 
 void pulse_sensor_init(pulse_sensor_t* sensor);
